@@ -62,7 +62,7 @@ if st.button("📥 재무제표 수집"):
         try:
             df = dart.finstate(code, bsns_year=year, reprt_code=report[1])
             if isinstance(df, pd.DataFrame) and not df.empty:
-                df["조회코드"] = code
+                df["조회기업"] = code_name_map.get(code, code)
                 result_list.append(df)
                 st.success(f"{code} - 수집 완료")
             else:
