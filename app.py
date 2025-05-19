@@ -20,7 +20,7 @@ dart = OpenDartReader(api_key)
 st.title("📊 DART 재무제표 수집기")
 st.markdown("종목코드를 입력하면 재무제표를 가져옵니다.")
 
-# 종목코드 → 기업명 매핑 (자주 사용하는 상장사 기준)
+# 1. 종목코드 → 기업명 매핑
 code_name_map = {
     "006400": "삼성SDI",
     "373220": "LG에너지솔루션",
@@ -35,14 +35,20 @@ code_name_map = {
     "148930": "에이치와이티씨",
 }
 
-# 멀티 선택 UI (기업명 기준으로 보여줌)
+company_names = list(code_name_map.values())
+
+# 2. 전체 선택 여부 체크박스
+select_all = st.checkbox("✅ 전체 선택", value=True)
+
+# 3. 멀티 선택: 기본값은 전체 or 비워두기
 selected_names = st.multiselect(
-    "✅ 종목 선택 (다중 선택 가능)", 
-    options=list(code_name_map.values()), 
-    default=["삼성SDI", "LG에너지솔루션", "유진테크놀로지"]
+    "🎯 조회할 기업 선택",
+    options=company_names,
+    default=company_names if select_all else [],
+    key="corp_selector"
 )
 
-# 기업명 → 종목코드 변환
+# 4. 선택된 기업명 → 종목코드 변환
 codes = [code for code, name in code_name_map.items() if name in selected_names]
 
 year = st.selectbox("조회 연도", options=[2024, 2023, 2022, 2021], index=1)
