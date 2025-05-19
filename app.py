@@ -22,7 +22,7 @@ st.markdown("종목코드를 입력하면 재무제표를 가져옵니다.")
 
 # 종목코드 → 기업명 매핑 (자주 사용하는 상장사 기준)
 code_name_map = {
-    "006400": "LG이노텍",
+    "006400": "삼성SDI",
     "373220": "LG에너지솔루션",
     "259630": "엠플러스",
     "137400": "피엔티",
@@ -39,7 +39,7 @@ code_name_map = {
 selected_names = st.multiselect(
     "✅ 종목 선택 (다중 선택 가능)", 
     options=list(code_name_map.values()), 
-    default=["LG이노텍", "LG에너지솔루션", "엠플러스"]
+    default=["삼성SDI", "LG에너지솔루션", "유진테크놀로지"]
 )
 
 # 기업명 → 종목코드 변환
