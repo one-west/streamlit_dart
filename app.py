@@ -42,16 +42,19 @@ select_all = st.checkbox("✅ 전체 선택", value=True)
 
 # 3. 멀티 선택: 기본값은 전체 or 비워두기
 selected_names = st.multiselect(
-    "🎯 조회할 기업 선택",
+    "조회할 기업 선택",
     options=company_names,
     default=company_names if select_all else [],
-    key="corp_selector"
+    key="corp_selector",
 )
 
 # 4. 선택된 기업명 → 종목코드 변환
 codes = [code for code, name in code_name_map.items() if name in selected_names]
 
-year = st.selectbox("조회 연도", options=[2024, 2023, 2022, 2021], index=1)
+years = st.multiselect(
+    "조회 연도 (복수 선택 가능)", [2024, 2023, 2022, 2021], default=[2023]
+)
+
 report = st.selectbox(
     "보고서 유형",
     options={
@@ -64,17 +67,19 @@ report = st.selectbox(
 
 if st.button("📥 재무제표 수집"):
     result_list = []
-    for code in codes:
-        try:
-            df = dart.finstate(code, bsns_year=year, reprt_code=report[1])
-            if isinstance(df, pd.DataFrame) and not df.empty:
-                df["조회기업"] = code_name_map.get(code, code)
-                result_list.append(df)
-                st.success(f"{code} - 수집 완료")
-            else:
-                st.warning(f"{code} - 데이터 없음")
-        except Exception as e:
-            st.error(f"{code} - 오류: {e}")
+    for year in years:
+        for code in codes:
+            try:
+                df = dart.finstate_all(code, bsns_year=year, reprt_code=report[1])
+                if isinstance(df, pd.DataFrame) and not df.empty:
+                    df["조회기업"] = code_name_map.get(code, code)
+                    df["조회연도"] = year
+                    result_list.append(df)
+                    st.success(f"{year} - {code} 수집 완료")
+                else:
+                    st.warning(f"{year} - {code} 데이터 없음")
+            except Exception as e:
+                st.error(f"{year} - {code} 오류: {e}")
 
     if result_list:
         result_df = pd.concat(result_list, ignore_index=True)
