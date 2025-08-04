@@ -3,6 +3,7 @@ import pandas as pd
 from dotenv import load_dotenv
 import OpenDartReader
 import os
+from datetime import datetime
 
 # ✅ API 키 불러오기: 우선순위 = 사용자 입력 > .env > secrets.toml
 load_dotenv()
@@ -51,8 +52,10 @@ selected_names = st.multiselect(
 # 4. 선택된 기업명 → 종목코드 변환
 codes = [code for code, name in code_name_map.items() if name in selected_names]
 
+current_year = datetime.now().year
+year_range = list(range(current_year, current_year - 10, -1))
 years = st.multiselect(
-    "조회 연도 (복수 선택 가능)", [2024, 2023, 2022, 2021], default=[2023]
+    "조회 연도 (복수 선택 가능)", year_range, default=[current_year - 1]
 )
 
 report = st.selectbox(
