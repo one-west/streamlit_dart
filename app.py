@@ -87,10 +87,25 @@ if st.button("📥 재무제표 수집"):
 
     if result_list:
         result_df = pd.concat(result_list, ignore_index=True)
+
+        # ✅ 숫자형 컬럼 처리: 금액 관련 문자열을 숫자로 변환
+        amount_columns = ["thstrm_amount", "frmtrm_amount", "bfefrmtrm_amount"]
+        for col in amount_columns:
+            if col in result_df.columns:
+                result_df[col] = (
+                    result_df[col]
+                    .astype(str)  # 혹시 모를 NaN 처리
+                    .str.replace(",", "")
+                    .str.strip()
+                    .replace("", "0")
+                    .replace("-", "0")
+                    .apply(pd.to_numeric, errors="coerce")
+                )
+
         st.dataframe(result_df)
 
-        # 엑셀로 다운로드
-        file_name = f"dart_finstate_{year}.xlsx"
+        # ✅ 엑셀 저장
+        file_name = f"dart_finstate_{'_'.join(map(str, years))}.xlsx"
         result_df.to_excel(file_name, index=False)
         with open(file_name, "rb") as f:
             st.download_button(
