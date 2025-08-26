@@ -1,5 +1,7 @@
 streamlit
 pandas
+numpy
 openpyxl
-OpenDartReader
+xlsxwriter
 python-dotenv
+OpenDartReader
