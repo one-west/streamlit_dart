@@ -119,10 +119,21 @@ if st.button("📥 재무제표 수집"):
 
         def _to_number(x):
             s = str(x)
-            # 괄호표기 (1,234) → -1234 처리
-            s = s.strip().replace("\u00a0", "").replace(",", "")
+            # 다양한 공백/기호 제거
+            s = (
+                s.replace("\u00a0", "")  # NBSP
+                .replace("\ufeff", "")  # BOM
+                .replace(",", "")
+                .replace("₩", "")
+                .replace("원", "")
+                .strip()
+            )
+            # 괄호표기 (1,234) -> -1234
             if s.startswith("(") and s.endswith(")"):
                 s = "-" + s[1:-1]
+            # +기호 제거
+            if s.startswith("+"):
+                s = s[1:]
             if s in ("", "-"):
                 return None
             return pd.to_numeric(s, errors="coerce")
