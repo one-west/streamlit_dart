@@ -68,45 +68,70 @@ def to_number_strict(x):
 # =========================
 def save_excel_with_comma_format(df: pd.DataFrame, file_name: str):
     """
-    모든 '*amount' 열을 숫자형으로 보정한 뒤,
-    XlsxWriter로 '각 셀'을 타입에 맞게 써서 (#,##0) 포맷을 확실히 적용.
+    1) 모든 '*amount' 열을 숫자형으로 보정
+    2) XlsxWriter로 '셀 단위' 숫자 쓰기(write_number) + #,##0 서식
+    3) openpyxl로 2차 검사: 혹시 남아있는 문자열 셀(=inlineStr/s) 있으면 숫자로 강제 변환 + #,##0 서식
     """
     import math
+    import re
+    from openpyxl import load_workbook
 
-    amount_cols = [c for c in df.columns if "amount" in str(c).lower()]
+    # (A) amount 열 식별 (헤더에 숨은 공백/제로폭 대비해 normalize)
+    def _norm_header(h: str) -> str:
+        if h is None:
+            return ""
+        t = str(h).lower()
+        for ch in [
+            "\u00a0",
+            "\ufeff",
+            "\u202f",
+            "\u2009",
+            "\u200a",
+            "\u2007",
+            "\u200b",
+            "\u200c",
+            "\u200d",
+            "\u2060",
+            "\u00ad",
+        ]:
+            t = t.replace(ch, "")
+        return t.strip()
 
-    # 1) 숫자형 보정
+    norm2orig = {}
+    for c in df.columns:
+        norm2orig[_norm_header(c)] = c
+    amount_cols = [c for c in df.columns if "amount" in _norm_header(c)]
+
+    # (B) 1차: DF에서 숫자형 보정
     for col in amount_cols:
         df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # 2) XlsxWriter로 '수동 작성'
+    # (C) 2차: XlsxWriter로 '셀 단위' 작성 (숫자→ write_number, 결측→ write_blank)
     with pd.ExcelWriter(file_name, engine="xlsxwriter") as writer:
         wb = writer.book
-        ws = wb.add_worksheet("Sheet1")  # 시트 직접 생성
+        ws = wb.add_worksheet("Sheet1")
+        writer.sheets["Sheet1"] = ws
 
-        # 포맷
         fmt_num = wb.add_format({"num_format": "#,##0"})
-        fmt_text = wb.add_format()  # 기본
-        fmt_blank = wb.add_format({"num_format": "#,##0"})  # 결측도 숫자 서식 유지
+        fmt_text = wb.add_format()
+        fmt_blank = wb.add_format({"num_format": "#,##0"})
 
-        # 헤더
+        # 헤더 작성
         for j, col in enumerate(df.columns):
             ws.write(0, j, col, fmt_text)
 
-        # 데이터(1행부터)
-        for i in range(len(df)):
+        # 데이터 작성 (1행부터)
+        n_rows, n_cols = df.shape
+        for i in range(n_rows):
             row = df.iloc[i]
             for j, col in enumerate(df.columns):
                 val = row[col]
                 if col in amount_cols:
-                    # 숫자는 write_number, 결측은 write_blank
                     if pd.isna(val):
                         ws.write_blank(i + 1, j, None, fmt_blank)
                     else:
-                        # 반드시 float로 캐스팅해 숫자 타입 보장
                         ws.write_number(i + 1, j, float(val), fmt_num)
                 else:
-                    # 그 외는 일반 write (숫자면 write_number로 써도 무방)
                     if pd.isna(val):
                         ws.write_blank(i + 1, j, None)
                     elif (
@@ -117,16 +142,89 @@ def save_excel_with_comma_format(df: pd.DataFrame, file_name: str):
                         ws.write_number(i + 1, j, float(val))
                     else:
                         ws.write(i + 1, j, str(val))
-
-        # 보기 편의: 자동필터
-        ws.autofilter(0, 0, len(df), len(df.columns) - 1)
-        # 열 너비(옵션)
+        # 보기 편의
+        ws.autofilter(0, 0, n_rows, n_cols - 1)
         for j, col in enumerate(df.columns):
             if col in amount_cols:
                 ws.set_column(j, j, 18, fmt_num)
             else:
                 ws.set_column(j, j, 18)
 
+    # (D) 3차: openpyxl로 2차 검사/교정 (혹시 남은 문자열 셀 있으면 숫자로 강제)
+    wb2 = load_workbook(file_name)
+    ws2 = wb2.active
+
+    # 헤더 인덱스 매핑
+    header = [c.value for c in ws2[1]]
+    name_to_colidx = {}
+    for idx_1based, h in enumerate(header, start=1):
+        if h is None:
+            continue
+        name_to_colidx[str(h)] = idx_1based
+
+    # 숫자 정규화(문자 → 숫자)
+    def _to_number_strict_openpyxl(x):
+        if x is None:
+            return None
+        s = str(x)
+        for ch in [
+            "\u00a0",
+            "\ufeff",
+            "\u202f",
+            "\u2009",
+            "\u200a",
+            "\u2007",
+            "\u200b",
+            "\u200c",
+            "\u200d",
+            "\u2060",
+            "\u00ad",
+        ]:
+            s = s.replace(ch, "")
+        s = s.replace(",", "").replace("₩", "").replace("원", "").strip()
+        s = (
+            s.replace("\u2011", "-")
+            .replace("\u2212", "-")
+            .replace("–", "-")
+            .replace("—", "-")
+        )
+        s = re.sub(r"^[\u25B3\u25B2]\s*", "-", s)  # △/▲
+        if re.fullmatch(r"\(.*\)", s):
+            s = "-" + s[1:-1].strip()
+        if s.startswith("+"):
+            s = s[1:]
+        s = re.sub(r"[^0-9\-\.+]", "", s)
+        if s in ("", "-", "--", "+"):
+            return None
+        try:
+            return float(s)
+        except Exception:
+            return None
+
+    for col in amount_cols:
+        col_idx = name_to_colidx.get(col)
+        if not col_idx:
+            # 헤더가 약간 달라진 경우 normalize로 재탐색
+            for h, idx in name_to_colidx.items():
+                if "amount" in _norm_header(h) and _norm_header(h) == _norm_header(col):
+                    col_idx = idx
+                    break
+        if not col_idx:
+            continue
+
+        for r in range(2, ws2.max_row + 1):
+            cell = ws2.cell(row=r, column=col_idx)
+            if isinstance(cell.value, str):
+                num = _to_number_strict_openpyxl(cell.value)
+                if num is not None:
+                    cell.value = num
+                    cell.number_format = "#,##0"
+            else:
+                # 숫자인 경우도 포맷 재보장
+                if cell.value is not None:
+                    cell.number_format = "#,##0"
+
+    wb2.save(file_name)
 
 # =========================
 #  앱 본문
