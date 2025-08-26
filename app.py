@@ -307,7 +307,7 @@ if st.button("📥 재무제표 수집"):
 
     with open(file_name, "rb") as f:
         st.download_button(
-            label="📁 엑셀 다운로드",
+            label="📁 엑셀 다운로드!",
             data=f,
             file_name=file_name,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
