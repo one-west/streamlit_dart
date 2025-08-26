@@ -5,3 +5,4 @@ openpyxl
 xlsxwriter
 python-dotenv
 OpenDartReader
+requests
