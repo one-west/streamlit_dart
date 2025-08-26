@@ -7,6 +7,7 @@ import OpenDartReader
 import os
 from datetime import datetime
 
+
 # =========================
 #  문자열 -> 숫자 변환 (강화)
 # =========================
@@ -17,8 +18,17 @@ def to_number_strict(x):
 
     # 공백/제로폭/소프트하이픈 제거
     for ch in [
-        "\u00a0", "\ufeff", "\u202f", "\u2009", "\u200a", "\u2007",
-        "\u200b", "\u200c", "\u200d", "\u2060", "\u00ad"
+        "\u00a0",
+        "\ufeff",
+        "\u202f",
+        "\u2009",
+        "\u200a",
+        "\u2007",
+        "\u200b",
+        "\u200c",
+        "\u200d",
+        "\u2060",
+        "\u00ad",
     ]:
         s = s.replace(ch, "")
 
@@ -26,10 +36,12 @@ def to_number_strict(x):
     s = s.replace(",", "").replace("₩", "").replace("원", "").strip()
 
     # 하이픈/마이너스 통일
-    s = (s.replace("\u2011", "-")   # non-breaking hyphen
-           .replace("\u2212", "-")  # unicode minus
-           .replace("–", "-")       # en dash
-           .replace("—", "-"))      # em dash
+    s = (
+        s.replace("\u2011", "-")  # non-breaking hyphen
+        .replace("\u2212", "-")  # unicode minus
+        .replace("–", "-")  # en dash
+        .replace("—", "-")
+    )  # em dash
 
     # 삼각형 음수표기 (△/▲) → 음수
     s = re.sub(r"^[\u25B3\u25B2]\s*", "-", s)
@@ -67,7 +79,19 @@ def save_excel_with_comma_format(df: pd.DataFrame, file_name: str):
         if h is None:
             return ""
         t = str(h).lower()
-        for ch in ["\u00a0", "\ufeff", "\u202f", "\u2009", "\u200a", "\u2007", "\u200b", "\u200c", "\u200d", "\u2060", "\u00ad"]:
+        for ch in [
+            "\u00a0",
+            "\ufeff",
+            "\u202f",
+            "\u2009",
+            "\u200a",
+            "\u2007",
+            "\u200b",
+            "\u200c",
+            "\u200d",
+            "\u2060",
+            "\u00ad",
+        ]:
             t = t.replace(ch, "")
         return t.strip()
 
@@ -83,8 +107,8 @@ def save_excel_with_comma_format(df: pd.DataFrame, file_name: str):
         ws = wb.add_worksheet("Sheet1")
         writer.sheets["Sheet1"] = ws
 
-        fmt_num   = wb.add_format({"num_format": "#,##0"})
-        fmt_text  = wb.add_format()
+        fmt_num = wb.add_format({"num_format": "#,##0"})
+        fmt_text = wb.add_format()
         fmt_blank = wb.add_format({"num_format": "#,##0"})
 
         # 헤더
@@ -99,18 +123,22 @@ def save_excel_with_comma_format(df: pd.DataFrame, file_name: str):
                 val = row[col]
                 if col in amount_cols:
                     if pd.isna(val):
-                        ws.write_blank(i+1, j, None, fmt_blank)
+                        ws.write_blank(i + 1, j, None, fmt_blank)
                     else:
-                        ws.write_number(i+1, j, float(val), fmt_num)
+                        ws.write_number(i + 1, j, float(val), fmt_num)
                 else:
                     if pd.isna(val):
-                        ws.write_blank(i+1, j, None)
-                    elif isinstance(val, (int, float)) and not isinstance(val, bool) and math.isfinite(val):
-                        ws.write_number(i+1, j, float(val))
+                        ws.write_blank(i + 1, j, None)
+                    elif (
+                        isinstance(val, (int, float))
+                        and not isinstance(val, bool)
+                        and math.isfinite(val)
+                    ):
+                        ws.write_number(i + 1, j, float(val))
                     else:
-                        ws.write(i+1, j, str(val))
+                        ws.write(i + 1, j, str(val))
 
-        ws.autofilter(0, 0, n_rows, n_cols-1)
+        ws.autofilter(0, 0, n_rows, n_cols - 1)
         for j, col in enumerate(df.columns):
             if col in amount_cols:
                 ws.set_column(j, j, 18, fmt_num)
@@ -123,16 +151,35 @@ def save_excel_with_comma_format(df: pd.DataFrame, file_name: str):
 
     # 헤더 인덱스 매핑
     header = [c.value for c in ws2[1]]
-    name_to_colidx = {str(h): idx for idx, h in enumerate(header, start=1) if h is not None}
+    name_to_colidx = {
+        str(h): idx for idx, h in enumerate(header, start=1) if h is not None
+    }
 
     def _to_number_strict_openpyxl(x):
         if x is None:
             return None
         s = str(x)
-        for ch in ["\u00a0","\ufeff","\u202f","\u2009","\u200a","\u2007","\u200b","\u200c","\u200d","\u2060","\u00ad"]:
+        for ch in [
+            "\u00a0",
+            "\ufeff",
+            "\u202f",
+            "\u2009",
+            "\u200a",
+            "\u2007",
+            "\u200b",
+            "\u200c",
+            "\u200d",
+            "\u2060",
+            "\u00ad",
+        ]:
             s = s.replace(ch, "")
-        s = (s.replace(",", "").replace("₩","").replace("원","").strip())
-        s = (s.replace("\u2011","-").replace("\u2212","-").replace("–","-").replace("—","-"))
+        s = s.replace(",", "").replace("₩", "").replace("원", "").strip()
+        s = (
+            s.replace("\u2011", "-")
+            .replace("\u2212", "-")
+            .replace("–", "-")
+            .replace("—", "-")
+        )
         s = re.sub(r"^[\u25B3\u25B2]\s*", "-", s)
         if re.fullmatch(r"\(.*\)", s):
             s = "-" + s[1:-1].strip()
@@ -204,9 +251,6 @@ code_name_map = {
 }
 company_names = list(code_name_map.values())
 
-# 옵션: 진단 모드
-diag_mode = st.sidebar.toggle("🔎 진단 모드(저장 전/후 thstrm_add_amount 점검)", value=False)
-
 select_all = st.checkbox("✅ 전체 선택", value=True)
 selected_names = st.multiselect(
     "조회할 기업 선택",
@@ -218,7 +262,9 @@ codes = [code for code, name in code_name_map.items() if name in selected_names]
 
 current_year = datetime.now().year
 year_range = list(range(current_year, current_year - 10, -1))
-years = st.multiselect("조회 연도 (복수 선택 가능)", year_range, default=[current_year - 1])
+years = st.multiselect(
+    "조회 연도 (복수 선택 가능)", year_range, default=[current_year - 1]
+)
 
 report_map = {
     "사업보고서": "11011",
@@ -262,52 +308,17 @@ if st.button("📥 재무제표 수집"):
     amount_like_cols = [c for c in result_df.columns if "amount" in str(c).lower()]
     for col in amount_like_cols:
         result_df[col] = result_df[col].apply(to_number_strict)
-        result_df[col] = pd.to_numeric(result_df[col], errors="coerce").astype("float64")
-
-    # 진단 모드: 저장 전 thstrm_add_amount 상태 확인
-    if diag_mode and "thstrm_add_amount" in result_df.columns:
-        target = "thstrm_add_amount"
-        str_mask = result_df[target].map(lambda v: isinstance(v, str))
-        st.info(f"[저장 전] {target} dtype: {result_df[target].dtype}, 문자열개수: {int(str_mask.sum())}, NaN: {int(result_df[target].isna().sum())}")
+        result_df[col] = pd.to_numeric(result_df[col], errors="coerce").astype(
+            "float64"
+        )
 
     # 저장
     file_name = f"dart_finstate_{'_'.join(map(str, years))}.xlsx"
     save_excel_with_comma_format(result_df, file_name)
 
-    # 진단 모드: 저장 후 실제 셀 타입 검증
-    if diag_mode and "thstrm_add_amount" in result_df.columns:
-        from openpyxl import load_workbook
-        wb = load_workbook(file_name, data_only=True)
-        ws = wb.active
-
-        col_idx = None
-        for c in ws[1]:
-            if str(c.value).strip().lower() == "thstrm_add_amount":
-                col_idx = c.col_idx
-                break
-
-        if col_idx is None:
-            st.error("엑셀에서 'thstrm_add_amount' 열을 찾지 못했습니다.")
-        else:
-            types = []
-            bad_rows = []
-            max_check = min(500, ws.max_row)
-            for r in range(2, max_check + 1):
-                cell = ws.cell(row=r, column=col_idx)
-                types.append(cell.data_type)  # 'n'이면 숫자, 's'/'inlineStr'면 텍스트
-                if cell.data_type not in (None, 'n') and cell.value is not None:
-                    bad_rows.append((r, repr(cell.value), cell.number_format))
-
-            st.info(f"[저장 후] 검사행수: {max_check-1}, 숫자형셀: {sum(t=='n' for t in types)}, 문자형셀: {sum((t not in (None,'n')) for t in types)}")
-            if bad_rows:
-                st.warning("문자형으로 남은 셀(일부):")
-                st.write(bad_rows[:20])
-            else:
-                st.success("모든 검사 셀에서 숫자형으로 저장되었습니다. (data_type='n')")
-
     with open(file_name, "rb") as f:
         st.download_button(
-            label="📁 엑셀 다운로드!",
+            label="📁 엑셀 다운로드",
             data=f,
             file_name=file_name,
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
