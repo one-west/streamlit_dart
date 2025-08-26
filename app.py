@@ -7,6 +7,7 @@ import OpenDartReader
 import os
 from datetime import datetime
 
+
 # =========================
 #  문자열 -> 숫자 변환 (강화)
 # =========================
@@ -17,22 +18,30 @@ def to_number_strict(x):
 
     # 공백/제로폭/소프트하이픈 제거
     for ch in [
-        "\u00a0", "\ufeff", "\u202f", "\u2009", "\u200a", "\u2007",
-        "\u200b", "\u200c", "\u200d", "\u2060", "\u00ad"
+        "\u00a0",
+        "\ufeff",
+        "\u202f",
+        "\u2009",
+        "\u200a",
+        "\u2007",
+        "\u200b",
+        "\u200c",
+        "\u200d",
+        "\u2060",
+        "\u00ad",
     ]:
         s = s.replace(ch, "")
 
     # 통화/천단위 제거
-    s = (s.replace(",", "")
-           .replace("₩", "")
-           .replace("원", "")
-           .strip())
+    s = s.replace(",", "").replace("₩", "").replace("원", "").strip()
 
     # 하이픈/마이너스 통일
-    s = (s.replace("\u2011", "-")
-           .replace("\u2212", "-")
-           .replace("–", "-")
-           .replace("—", "-"))
+    s = (
+        s.replace("\u2011", "-")
+        .replace("\u2212", "-")
+        .replace("–", "-")
+        .replace("—", "-")
+    )
 
     # 삼각형 음수표기 처리 (△/▲)
     s = re.sub(r"^[\u25B3\u25B2]\s*", "-", s)
@@ -58,18 +67,65 @@ def to_number_strict(x):
 #  엑셀 저장 (Styler 사용)
 # =========================
 def save_excel_with_comma_format(df: pd.DataFrame, file_name: str):
-    # amount 컬럼 보정
+    """
+    모든 '*amount' 열을 숫자형으로 보정한 뒤,
+    XlsxWriter로 '각 셀'을 타입에 맞게 써서 (#,##0) 포맷을 확실히 적용.
+    """
+    import math
+
     amount_cols = [c for c in df.columns if "amount" in str(c).lower()]
+
+    # 1) 숫자형 보정
     for col in amount_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce").astype("float64")
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
-    # Styler 포맷 지정
-    fmt_map = {col: "{:,.0f}" for col in amount_cols}
-    styler = df.style.format(fmt_map, na_rep="")
-
-    # 저장
+    # 2) XlsxWriter로 '수동 작성'
     with pd.ExcelWriter(file_name, engine="xlsxwriter") as writer:
-        styler.to_excel(writer, sheet_name="Sheet1", index=False)
+        wb = writer.book
+        ws = wb.add_worksheet("Sheet1")  # 시트 직접 생성
+
+        # 포맷
+        fmt_num = wb.add_format({"num_format": "#,##0"})
+        fmt_text = wb.add_format()  # 기본
+        fmt_blank = wb.add_format({"num_format": "#,##0"})  # 결측도 숫자 서식 유지
+
+        # 헤더
+        for j, col in enumerate(df.columns):
+            ws.write(0, j, col, fmt_text)
+
+        # 데이터(1행부터)
+        for i in range(len(df)):
+            row = df.iloc[i]
+            for j, col in enumerate(df.columns):
+                val = row[col]
+                if col in amount_cols:
+                    # 숫자는 write_number, 결측은 write_blank
+                    if pd.isna(val):
+                        ws.write_blank(i + 1, j, None, fmt_blank)
+                    else:
+                        # 반드시 float로 캐스팅해 숫자 타입 보장
+                        ws.write_number(i + 1, j, float(val), fmt_num)
+                else:
+                    # 그 외는 일반 write (숫자면 write_number로 써도 무방)
+                    if pd.isna(val):
+                        ws.write_blank(i + 1, j, None)
+                    elif (
+                        isinstance(val, (int, float))
+                        and not isinstance(val, bool)
+                        and math.isfinite(val)
+                    ):
+                        ws.write_number(i + 1, j, float(val))
+                    else:
+                        ws.write(i + 1, j, str(val))
+
+        # 보기 편의: 자동필터
+        ws.autofilter(0, 0, len(df), len(df.columns) - 1)
+        # 열 너비(옵션)
+        for j, col in enumerate(df.columns):
+            if col in amount_cols:
+                ws.set_column(j, j, 18, fmt_num)
+            else:
+                ws.set_column(j, j, 18)
 
 
 # =========================
@@ -116,7 +172,9 @@ codes = [code for code, name in code_name_map.items() if name in selected_names]
 
 current_year = datetime.now().year
 year_range = list(range(current_year, current_year - 10, -1))
-years = st.multiselect("조회 연도 (복수 선택 가능)", year_range, default=[current_year - 1])
+years = st.multiselect(
+    "조회 연도 (복수 선택 가능)", year_range, default=[current_year - 1]
+)
 
 report_map = {
     "사업보고서": "11011",
@@ -160,7 +218,9 @@ if st.button("📥 재무제표 수집"):
     amount_like_cols = [c for c in result_df.columns if "amount" in str(c).lower()]
     for col in amount_like_cols:
         result_df[col] = result_df[col].apply(to_number_strict)
-        result_df[col] = pd.to_numeric(result_df[col], errors="coerce").astype("float64")
+        result_df[col] = pd.to_numeric(result_df[col], errors="coerce").astype(
+            "float64"
+        )
 
     # 저장
     file_name = f"dart_finstate_{'_'.join(map(str, years))}.xlsx"
