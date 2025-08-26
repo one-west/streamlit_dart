@@ -10,20 +10,19 @@ from openpyxl import load_workbook
 def save_excel_with_comma_format(df: pd.DataFrame, file_name: str):
     """
     DataFrame을 엑셀로 저장한 뒤, 컬럼명에 'amount'가 포함된 열의 표시형식을
-    '#,##0'으로 지정함
+    '#,##0'으로 지정
     """
-    # 1) 우선 평범하게 저장
+    # 1) 우선 저장
     df.to_excel(file_name, index=False)
 
-    # 2) openpyxl로 불러와 서식 적용
+    # 2) openpyxl로 서식 적용
     wb = load_workbook(file_name)
     ws = wb.active
 
-    # 대상 열 인덱스 (1-based): 컬럼명에 'amount'가 포함된 열
+    # 'amount' 포함 열(1-based index)
     amount_cols = [i + 1 for i, col in enumerate(df.columns) if "amount" in col.lower()]
 
     if amount_cols:
-        # 헤더(1행) 제외하고 2행부터 끝까지 적용
         for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
             for idx in amount_cols:
                 cell = row[idx - 1]
@@ -115,26 +114,25 @@ if st.button("📥 재무제표 수집"):
     if result_list:
         result_df = pd.concat(result_list, ignore_index=True)
 
-        # # ✅ 숫자형 컬럼 처리: 금액 관련 문자열을 숫자로 변환
-        # amount_columns = ["thstrm_amount", "frmtrm_amount", "bfefrmtrm_amount"]
-        # for col in amount_columns:
-        #     if col in result_df.columns:
-        #         result_df[col] = (
-        #             result_df[col]
-        #             .astype(str)  # 혹시 모를 NaN 처리
-        #             .str.replace(",", "")
-        #             .str.strip()
-        #             .replace("", "0")
-        #             .replace("-", "0")
-        #             .apply(pd.to_numeric, errors="coerce")
-        #         )
+        # ✅ 'amount'가 들어간 모든 컬럼을 숫자로 변환 (thstrm_add_amount 포함)
+        amount_like_cols = [c for c in result_df.columns if "amount" in c.lower()]
 
-        # st.dataframe(result_df)
+        def _to_number(x):
+            s = str(x)
+            # 괄호표기 (1,234) → -1234 처리
+            s = s.strip().replace("\u00a0", "").replace(",", "")
+            if s.startswith("(") and s.endswith(")"):
+                s = "-" + s[1:-1]
+            if s in ("", "-"):
+                return None
+            return pd.to_numeric(s, errors="coerce")
+
+        for col in amount_like_cols:
+            result_df[col] = result_df[col].apply(_to_number)
 
         # ✅ 엑셀 저장
         file_name = f"dart_finstate_{'_'.join(map(str, years))}.xlsx"
         save_excel_with_comma_format(result_df, file_name)  # ← 쉼표 서식 적용 저장
-
         with open(file_name, "rb") as f:
             st.download_button(
                 label="📁 엑셀 다운로드",
